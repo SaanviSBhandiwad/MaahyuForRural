@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Maahyu — Calendar</title>
+  <link rel="stylesheet" href="./css/variables.css" />
+  <link rel="stylesheet" href="./css/style.css" />
+</head>
+<body>
+  <div class="offline-banner" data-offline-banner data-i18n="offline">You're offline — Maahyu still works.</div>
+
+  <header class="topbar">
+    <span class="topbar__brand">Maahyu</span>
+    <a class="topbar__icon-btn" href="./home.html" aria-label="Back to home">✕</a>
+  </header>
+
+  <main class="screen">
+    <h1 data-i18n="calendar.title">Your calendar</h1>
+    <p style="color:var(--text-onDark-muted); margin-top:8px;" data-i18n="calendar.sub">
+      One dot for every day you talked to Maahyu. Tap a day to listen back.
+    </p>
+
+    <div id="calendarGrid" class="calendar-grid" aria-label="Mood calendar"></div>
+    <p id="emptyState" class="hidden" style="color:var(--text-onDark-muted); margin-top:16px;" data-i18n="calendar.empty"></p>
+
+    <div class="calendar-legend">
+      <span><span class="legend-swatch" style="background:var(--sage-500)"></span><span data-i18n="calendar.legendGood">Good day</span></span>
+      <span><span class="legend-swatch" style="background:var(--marigold-400)"></span><span data-i18n="calendar.legendMid">In between</span></span>
+      <span><span class="legend-swatch" style="background:var(--danger-500)"></span><span data-i18n="calendar.legendLow">Rough day</span></span>
+    </div>
+
+    <div id="playbackSheet" class="playback-sheet hidden">
+      <div class="playback-sheet__date" id="playbackDate"></div>
+      <div class="playback-sheet__controls">
+        <button class="playback-sheet__play-btn" id="playbackPlayBtn" aria-label="Play voice note">▶</button>
+        <div id="playbackTranscript" style="font-size:14px; color:var(--text-onDark-muted); flex:1;"></div>
+      </div>
+      <audio id="playbackAudio" class="hidden"></audio>
+    </div>
+
+    <nav class="tab-dock" aria-label="Sections">
+      <a href="./home.html" data-tab="home"><span aria-hidden="true">🏠</span><span data-i18n="home.navHome">Home</span></a>
+      <a href="./calendar.html" data-tab="calendar" class="is-active"><span aria-hidden="true">📅</span><span data-i18n="home.navCalendar">Calendar</span></a>
+      <a href="./settings.html" data-tab="settings"><span aria-hidden="true">⚙</span><span data-i18n="home.navSettings">Settings</span></a>
+    </nav>
+  </main>
+
+  <script type="module" src="./js/calendar-page.js"></script>
+</body>
+</html>

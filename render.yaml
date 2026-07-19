@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: maahyu
+    runtime: static
+    staticPublishPath: .
+    buildCommand: "echo 'No build step needed — plain HTML/CSS/JS static site'"
+    headers:
+      - path: /*
+        name: Cache-Control
+        value: no-cache

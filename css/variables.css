@@ -1,0 +1,68 @@
+/* ============================================================
+   MAAHYU — Design tokens
+   Palette rationale:
+   - Dusk indigo: the calm, low-stimulation base — night is when
+     many rural mothers finally get a quiet moment to themselves.
+   - Marigold: warmth and everyday ritual (marigold garlands mark
+     nearly every home occasion in India) — used only on the one
+     thing she's meant to touch: the mic.
+   - Sage: reassurance / "you're okay" states, mood + calendar.
+   - Blush parchment: soft light surface for text-heavy screens.
+   ============================================================ */
+
+:root {
+  /* Core palette */
+  --dusk-900: #211B33;
+  --dusk-700: #2D2545;
+  --dusk-500: #453A66;
+  --marigold-500: #E8A33D;
+  --marigold-400: #F0B65E;
+  --marigold-glow: rgba(232, 163, 61, 0.35);
+  --sage-500: #7C9885;
+  --sage-300: #A9C2AF;
+  --blush-100: #FBF3ED;
+  --blush-050: #FDF9F6;
+  --ink-900: #211B33;
+  --ink-050: #FAF6F1;
+  --danger-500: #C1553F;
+
+  /* Semantic */
+  --bg-app: var(--dusk-900);
+  --bg-surface: var(--dusk-700);
+  --bg-card: var(--blush-050);
+  --text-onDark: var(--ink-050);
+  --text-onDark-muted: #C7C0D9;
+  --text-onLight: var(--ink-900);
+  --text-onLight-muted: #6B6480;
+  --accent: var(--marigold-500);
+  --accent-strong: var(--marigold-400);
+  --calm: var(--sage-500);
+
+  /* Type */
+  --font-display: 'Baloo 2', 'Noto Sans Kannada', 'Noto Sans Devanagari', sans-serif;
+  --font-body: 'Inter', 'Noto Sans Kannada', 'Noto Sans Devanagari', sans-serif;
+
+  /* Scale */
+  --radius-lg: 28px;
+  --radius-md: 18px;
+  --radius-sm: 10px;
+  --space-1: 8px;
+  --space-2: 16px;
+  --space-3: 24px;
+  --space-4: 40px;
+  --space-5: 64px;
+
+  --shadow-soft: 0 12px 32px rgba(33, 27, 51, 0.28);
+  --shadow-mic: 0 0 0 0 var(--marigold-glow);
+
+  --duration-fast: 160ms;
+  --duration-med: 320ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

@@ -1,0 +1,58 @@
+{
+  "code": "en",
+  "label": "English",
+  "glyph": "A",
+  "splash": {
+    "title": "You don't have to go through this alone",
+    "subtitle": "Maahyu is a quiet place to talk about how you feel. No forms, no typing — just your voice.",
+    "cta": "Continue"
+  },
+  "home": {
+    "greeting": "How are you today?",
+    "sub": "Tap and talk, like a voice note to a friend",
+    "listening": "Listening…",
+    "tapToStart": "Tap to talk",
+    "tapToStop": "Tap to stop",
+    "chips": ["I feel tired", "I'm scared", "I feel alone", "Today was good"],
+    "talkToSomeone": "Talk to someone",
+    "processing": "Maahyu is listening to what you shared…",
+    "navHome": "Home",
+    "navCalendar": "Calendar",
+    "navSettings": "Settings"
+  },
+  "reply": {
+    "label": "Maahyu says",
+    "play": "Play reply"
+  },
+  "escalation": {
+    "title": "You matter, and you don't have to carry this alone.",
+    "body": "It sounds like things have been really hard. Would you like to talk to a real person right now?",
+    "cta": "Connect me to someone",
+    "dismiss": "Not right now"
+  },
+  "connect": {
+    "title": "Reaching out",
+    "body": "Connecting you with your local ASHA worker / helpline.",
+    "helplineName": "iCall Mental Health Helpline",
+    "helplineNumber": "9152987821",
+    "close": "Close"
+  },
+  "calendar": {
+    "title": "Your calendar",
+    "sub": "One dot for every day you talked to Maahyu. Tap a day to listen back.",
+    "empty": "Nothing here yet — your first voice note will show up as a dot.",
+    "legendLow": "Rough day",
+    "legendMid": "In between",
+    "legendGood": "Good day"
+  },
+  "settings": {
+    "title": "Settings",
+    "language": "Language",
+    "voice": "Voice replies",
+    "voiceSub": "Maahyu speaks its replies out loud",
+    "share": "Share with a trusted person",
+    "shareSub": "Off by default. Nothing is ever shared automatically.",
+    "signOutNote": "Your voice notes are private to you and never shown to anyone else unless you choose to share."
+  },
+  "offline": "You're offline — Maahyu still works. Your voice note will send once you're back online."
+}

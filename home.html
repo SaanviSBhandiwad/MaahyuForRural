@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Maahyu</title>
+  <link rel="stylesheet" href="./css/variables.css" />
+  <link rel="stylesheet" href="./css/style.css" />
+</head>
+<body>
+  <div class="offline-banner" data-offline-banner data-i18n="offline">You're offline — Maahyu still works.</div>
+
+  <header class="topbar">
+    <span class="topbar__brand">Maahyu</span>
+    <a class="topbar__icon-btn" href="./settings.html" aria-label="Settings">⚙</a>
+  </header>
+
+  <main class="screen home">
+    <div class="home__greeting">
+      <h1 data-i18n="home.greeting">How are you today?</h1>
+      <p data-i18n="home.sub">Tap and talk, like a voice note to a friend</p>
+    </div>
+
+    <div class="mic-stage">
+      <div class="mic-ring" id="micRing" aria-hidden="true"></div>
+      <button class="mic-btn" id="micBtn" aria-pressed="false" aria-label="Tap to talk">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#211B33" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+          <line x1="12" y1="19" x2="12" y2="23"></line>
+          <line x1="8" y1="23" x2="16" y2="23"></line>
+        </svg>
+        <span class="mic-status" id="micStatus" data-i18n="home.tapToStart">Tap to talk</span>
+      </button>
+    </div>
+
+    <div class="chip-row" id="chipRow" aria-hidden="true"></div>
+
+    <div id="replyArea"></div>
+
+    <button class="talk-to-someone" id="talkToSomeoneBtn">
+      <span>💛</span><span data-i18n="home.talkToSomeone">Talk to someone</span>
+    </button>
+
+    <nav class="tab-dock" aria-label="Sections">
+      <a href="./home.html" data-tab="home" class="is-active">
+        <span aria-hidden="true">🏠</span><span data-i18n="home.navHome">Home</span>
+      </a>
+      <a href="./calendar.html" data-tab="calendar">
+        <span aria-hidden="true">📅</span><span data-i18n="home.navCalendar">Calendar</span>
+      </a>
+      <a href="./settings.html" data-tab="settings">
+        <span aria-hidden="true">⚙</span><span data-i18n="home.navSettings">Settings</span>
+      </a>
+    </nav>
+  </main>
+
+  <!-- Connect-to-helpline modal, reached from "Talk to someone" or the crisis banner -->
+  <div id="connectModal" class="screen screen--centered hidden" style="position:fixed; inset:0; background:rgba(33,27,51,0.92); z-index:20;">
+    <h2 data-i18n="connect.title">Reaching out</h2>
+    <p data-i18n="connect.body" style="color:var(--text-onDark-muted); margin-top:8px;">Connecting you with your local ASHA worker / helpline.</p>
+    <div class="reply-card" style="width:100%; margin-top:24px;">
+      <div class="reply-card__label" data-i18n="connect.helplineName">iCall Mental Health Helpline</div>
+      <div class="reply-card__text" id="helplineNumber" style="font-size:22px; font-weight:700;">9152987821</div>
+    </div>
+    <button class="btn-primary" id="closeConnectModal" style="margin-top:24px;" data-i18n="connect.close">Close</button>
+  </div>
+
+  <script type="module" src="./js/home-page.js"></script>
+</body>
+</html>

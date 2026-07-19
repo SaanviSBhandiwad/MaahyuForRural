@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Maahyu — Settings</title>
+  <link rel="stylesheet" href="./css/variables.css" />
+  <link rel="stylesheet" href="./css/style.css" />
+</head>
+<body>
+  <div class="offline-banner" data-offline-banner data-i18n="offline">You're offline — Maahyu still works.</div>
+
+  <header class="topbar">
+    <span class="topbar__brand">Maahyu</span>
+    <a class="topbar__icon-btn" href="./home.html" aria-label="Back to home">✕</a>
+  </header>
+
+  <main class="screen">
+    <h1 data-i18n="settings.title">Settings</h1>
+
+    <div style="margin-top:24px;">
+      <div class="setting-row__label" data-i18n="settings.language" style="margin-bottom:10px;">Language</div>
+      <div class="lang-select-list" id="langList"></div>
+    </div>
+
+    <div style="margin-top:32px;">
+      <div class="setting-row">
+        <div>
+          <div class="setting-row__label" data-i18n="settings.voice">Voice replies</div>
+          <div class="setting-row__sub" data-i18n="settings.voiceSub">Maahyu speaks its replies out loud</div>
+        </div>
+        <button class="switch is-on" id="voiceSwitch" role="switch" aria-checked="true" aria-label="Toggle voice replies"><span class="switch__knob"></span></button>
+      </div>
+
+      <div class="setting-row">
+        <div>
+          <div class="setting-row__label" data-i18n="settings.share">Share with a trusted person</div>
+          <div class="setting-row__sub" data-i18n="settings.shareSub">Off by default. Nothing is ever shared automatically.</div>
+        </div>
+        <button class="switch" id="shareSwitch" role="switch" aria-checked="false" aria-label="Toggle sharing with a trusted person"><span class="switch__knob"></span></button>
+      </div>
+    </div>
+
+    <p style="margin-top:24px; font-size:13px; color:var(--text-onDark-muted); line-height:1.5;" data-i18n="settings.signOutNote"></p>
+
+    <nav class="tab-dock" aria-label="Sections">
+      <a href="./home.html" data-tab="home"><span aria-hidden="true">🏠</span><span data-i18n="home.navHome">Home</span></a>
+      <a href="./calendar.html" data-tab="calendar"><span aria-hidden="true">📅</span><span data-i18n="home.navCalendar">Calendar</span></a>
+      <a href="./settings.html" data-tab="settings" class="is-active"><span aria-hidden="true">⚙</span><span data-i18n="home.navSettings">Settings</span></a>
+    </nav>
+  </main>
+
+  <script type="module" src="./js/settings-page.js"></script>
+</body>
+</html>

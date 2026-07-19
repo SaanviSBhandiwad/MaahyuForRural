@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Maahyu</title>
+  <link rel="stylesheet" href="./css/variables.css" />
+  <link rel="stylesheet" href="./css/style.css" />
+</head>
+<body>
+  <main class="screen screen--centered">
+    <div class="splash__story" aria-hidden="true">
+      <span class="splash__ripple" style="width:40px;height:40px;"></span>
+      <span class="splash__ripple" style="width:40px;height:40px;"></span>
+      <span class="splash__ripple" style="width:40px;height:40px;"></span>
+    </div>
+
+    <h1 class="splash__title" data-i18n="splash.title">You don't have to go through this alone</h1>
+    <p class="splash__subtitle" data-i18n="splash.subtitle">
+      Maahyu is a quiet place to talk about how you feel. No forms, no typing — just your voice.
+    </p>
+
+    <div class="lang-grid" id="langGrid" role="list" aria-label="Choose your language"></div>
+
+    <div style="height:24px"></div>
+    <button class="btn-primary" id="continueBtn" disabled data-i18n="splash.cta">Continue</button>
+  </main>
+
+  <script type="module">
+    import { SUPPORTED_LANGUAGES, setStoredLanguage, loadLanguage, applyTranslations, getStoredLanguage } from "./js/i18n.js";
+    import { ensureSignedIn } from "./js/firebase-init.js";
+
+    const langMeta = {
+      en: { glyph: "A", label: "English" },
+      hi: { glyph: "अ", label: "हिंदी" },
+      kn: { glyph: "ಅ", label: "ಕನ್ನಡ" }
+    };
+
+    const grid = document.getElementById("langGrid");
+    const continueBtn = document.getElementById("continueBtn");
+    let selected = null;
+
+    SUPPORTED_LANGUAGES.forEach((code) => {
+      const card = document.createElement("button");
+      card.className = "lang-card";
+      card.setAttribute("role", "listitem");
+      card.innerHTML = `<span class="lang-card__glyph">${langMeta[code].glyph}</span><span>${langMeta[code].label}</span>`;
+      card.addEventListener("click", async () => {
+        document.querySelectorAll(".lang-card").forEach((c) => c.classList.remove("is-selected"));
+        card.classList.add("is-selected");
+        selected = code;
+        continueBtn.disabled = false;
+        await loadLanguage(code);
+        applyTranslations();
+      });
+      grid.appendChild(card);
+    });
+
+    // If the user has already onboarded before, skip straight to home.
+    const existing = getStoredLanguage();
+    if (existing) {
+      window.location.replace("./home.html");
+    }
+
+    // Sign in silently in the background so home.html loads instantly.
+    ensureSignedIn().catch((err) => console.error("Sign-in failed:", err));
+
+    continueBtn.addEventListener("click", () => {
+      if (!selected) return;
+      setStoredLanguage(selected);
+      window.location.href = "./home.html";
+    });
+  </script>
+</body>
+</html>
