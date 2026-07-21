@@ -448,3 +448,8 @@ input:focus-visible {
 @media (min-width: 540px) {
   .screen { padding: var(--space-4); }
 }
+.escalation-banner--suggest {
+  background: rgba(124, 152, 133, 0.14);
+  border-color: rgba(124, 152, 133, 0.35);
+  color: var(--sage-300, #a8c5b0);
+}
