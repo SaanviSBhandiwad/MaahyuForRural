@@ -141,3 +141,10 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# Firebase service account (secret - never commit)
+backend/serviceAccountKey.json
+
+# Generated voice reply audio files (not needed in repo)
+backend/public-audio/*.mp3
+!backend/public-audio/.gitkeep
