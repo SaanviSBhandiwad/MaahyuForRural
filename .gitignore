@@ -148,3 +148,5 @@ backend/serviceAccountKey.json
 # Generated voice reply audio files (not needed in repo)
 backend/public-audio/*.mp3
 !backend/public-audio/.gitkeep
+
+backend/speechServiceAccountKey.json
