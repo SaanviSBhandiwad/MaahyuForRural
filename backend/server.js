@@ -1,220 +1,306 @@
-// ─── Imports (order matters!) ─────────────────────────────────────────────────
-import dotenv from "dotenv";
-dotenv.config(); // ← must be FIRST so process.env is ready
+// ============================================================
+// MAAHYU — Backend
+// ------------------------------------------------------------
+// Every message from every channel goes through ONE pipeline:
+// lib/pipeline.js → processMessage(). This file only handles
+// transport: auth, HTTP endpoints, Twilio, speech in/out.
+//
+//   POST /chat              app message      (Firebase ID token required)
+//   POST /entries/sync      offline queue    (Firebase ID token required)
+//   GET  /me                her motherId     (Firebase ID token required)
+//   POST /tts               spoken reply     (Firebase ID token required)
+//   POST /grandma-wisdom    wisdom cards
+//   POST /whatsapp/webhook  Twilio WhatsApp
+//   /asha/*                 ASHA dashboard (phone-OTP sign-in, see lib/asha.js)
+// ============================================================
+// Loads .env BEFORE every other import runs. (A plain dotenv.config() call
+// would run after all imports, so modules reading process.env at load
+// time — like lib/pipeline.js — would see empty values.)
+import "dotenv/config";
 
-import express from "express";
-import cors from "cors";
-import { GoogleGenAI } from "@google/genai";
-import { initializeApp, cert } from "firebase-admin/app";
-import { getFirestore } from "firebase-admin/firestore";
-import axios from "axios";
 import speech from "@google-cloud/speech";
 import textToSpeech from "@google-cloud/text-to-speech";
-import { createReadStream } from "fs";
+import { GoogleGenAI } from "@google/genai";
+import axios from "axios";
+import cors from "cors";
+import express from "express";
+import { cert, initializeApp } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
+import { getFirestore } from "firebase-admin/firestore";
 import fs from "fs";
-//import { buildContextBlock } from "./rag/ragEngine.js";
+import path from "path";
+import { fileURLToPath } from "url";
 
+import { createAshaRouter } from "./lib/asha.js";
+import {
+  getOrCreateAppMother,
+  getOrCreateWhatsAppMother,
+  toShortLang, toSpeechLang
+} from "./lib/mothers.js";
+import { processMessage } from "./lib/pipeline.js";
 
-const speechClient = new speech.SpeechClient();
-const ttsClient = new textToSpeech.TextToSpeechClient();
-
-const serviceAccount = process.env.SERVICE_ACCOUNT_JSON
-  ? JSON.parse(process.env.SERVICE_ACCOUNT_JSON)
-  : (await import("./serviceAccountKey.json", { with: { type: "json" } })).default;
-
-// ─── Firebase Admin init ──────────────────────────────────────────────────────
-initializeApp({ credential: cert(serviceAccount) });
-const adminDb = getFirestore();
-
-// ─── Express setup ────────────────────────────────────────────────────────────
-const app = express();
-
-app.use(cors({
-  origin: ["http://localhost:8080", "http://localhost:5173", "https://your-render-app.onrender.com"],
-  methods: ["GET", "POST"],
-}));
-app.use(express.json());
-app.use('/audio', express.static('public-audio'));
-
-// ─── Gemini AI ────────────────────────────────────────────────────────────────
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY,
+// Log unexpected async errors instead of crashing the whole server.
+process.on("unhandledRejection", (err) => {
+  console.error("Unhandled error (server kept running):", err?.message || err);
 });
 
-// ─── Flag keyword lists ───────────────────────────────────────────────────────
-const HIGH_SEVERITY_KEYWORDS = [
-  "kill myself", "end my life", "want to die", "suicide", "hurt myself",
-  "can't go on", "dont want to live", "don't want to live", "harm myself",
-  "self harm", "self-harm", "not worth living", "better off dead",
-  "end it all", "no reason to live",
-];
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const AUDIO_DIR = path.join(__dirname, "public-audio");
 
-const MEDIUM_SEVERITY_KEYWORDS = [
-  "hopeless", "worthless", "nobody cares", "give up", "can't cope",
-  "cant cope", "falling apart", "hate myself", "no point", "disappear",
-  "exhausted and broken", "can't do this anymore", "cant do this anymore",
-  "feel empty", "nothing matters", "so alone", "completely alone",
-];
+// ─── Firebase service account ───────────────────────────────────────────────
+const serviceAccount = process.env.SERVICE_ACCOUNT_JSON
+  ? JSON.parse(process.env.SERVICE_ACCOUNT_JSON)
+  : JSON.parse(fs.readFileSync(path.join(__dirname, "serviceAccountKey.json"), "utf8"));
 
-function detectFlags(message) {
-  const lower = message.toLowerCase();
-  const highHits   = HIGH_SEVERITY_KEYWORDS.filter((k) => lower.includes(k));
-  const mediumHits = MEDIUM_SEVERITY_KEYWORDS.filter((k) => lower.includes(k));
-
-  if (highHits.length > 0) {
-    return { flagged: true, severity: "high",   keywords: highHits };
+// ─── Speech credentials (Speech-to-Text + Text-to-Speech) ───────────────────
+// Found automatically so a wrong path in .env can never crash the server:
+//   1. SPEECH_CREDENTIALS_JSON env var (paste the whole JSON; for Render)
+//   2. GOOGLE_APPLICATION_CREDENTIALS, resolved from the backend folder
+//   3. backend/speechServiceAccountKey*.json (also catches "… (1).json")
+//   4. the Firebase service account above
+function readKeyFile(file) {
+  try {
+    const key = JSON.parse(fs.readFileSync(file, "utf8"));
+    return key.client_email && key.private_key ? key : null;
+  } catch {
+    return null;
   }
-  if (mediumHits.length > 0) {
-    return { flagged: true, severity: "medium", keywords: mediumHits };
-  }
-  return { flagged: false };
 }
 
-function classifyMessage(body) {
-  if (parseInt(body.NumMedia) > 0 && body.MediaContentType0?.startsWith('audio')) {
-    return 'voice';
+function findSpeechCredentials() {
+  if (process.env.SPEECH_CREDENTIALS_JSON) {
+    try {
+      return { key: JSON.parse(process.env.SPEECH_CREDENTIALS_JSON), source: "SPEECH_CREDENTIALS_JSON" };
+    } catch {
+      console.warn("⚠️  SPEECH_CREDENTIALS_JSON is not valid JSON, ignoring it.");
+    }
   }
-  const emojiRegex = /^[\u{1F600}-\u{1F64F}\u{2600}-\u{27BF}]+$/u;
-  if (body.Body && emojiRegex.test(body.Body.trim())) {
-    return 'emoji';
+  const files = [];
+  const envPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+  if (envPath) files.push(path.isAbsolute(envPath) ? envPath : path.join(__dirname, envPath));
+  for (const name of fs.readdirSync(__dirname).sort()) {
+    if (/^speechServiceAccountKey.*\.json$/i.test(name)) files.push(path.join(__dirname, name));
   }
-  return 'text';
+  for (const file of files) {
+    const key = readKeyFile(file);
+    if (key) return { key, source: path.relative(__dirname, file) || file };
+  }
+  if (envPath) {
+    console.warn(`⚠️  GOOGLE_APPLICATION_CREDENTIALS points to a missing or invalid file: ${envPath}`);
+  }
+  return { key: serviceAccount, source: "serviceAccountKey.json (Firebase key)" };
 }
 
-// ─── ADD transcription function────────────────────────────────────────────
-async function transcribeVoiceNote(mediaUrl) {
+const speechCreds = findSpeechCredentials();
+// Stop Google libraries from separately reading a possibly-wrong path.
+delete process.env.GOOGLE_APPLICATION_CREDENTIALS;
+console.log(`🎙️  Speech key: ${speechCreds.source} (project ${speechCreds.key.project_id})`);
+
+const speechClientOptions = {
+  credentials: { client_email: speechCreds.key.client_email, private_key: speechCreds.key.private_key },
+  projectId: speechCreds.key.project_id
+};
+const speechClient = new speech.SpeechClient(speechClientOptions);
+const ttsClient = new textToSpeech.TextToSpeechClient(speechClientOptions);
+
+initializeApp({ credential: cert(serviceAccount) });
+console.log(`🔑 Firebase project (from service account): ${serviceAccount.project_id}`);
+const adminDb = getFirestore();
+const adminAuth = getAuth();
+
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const deps = { db: adminDb, ai };
+
+// ─── Express ────────────────────────────────────────────────────────────────
+const app = express();
+
+// Extra allowed origins (e.g. your Render site) go in .env as
+// CORS_ORIGINS=https://maahyu.onrender.com,https://other.example
+const allowedOrigins = [
+  "http://localhost:8080", "http://127.0.0.1:8080", "http://localhost:5173",
+  ...(process.env.CORS_ORIGINS || "").split(",").map((s) => s.trim()).filter(Boolean)
+];
+app.use(cors({ origin: allowedOrigins, methods: ["GET", "POST"] }));
+app.use(express.json({ limit: "200kb" }));
+app.use("/audio", express.static(AUDIO_DIR));
+
+// ─── Auth: verify the app's Firebase ID token ───────────────────────────────
+// The app sends "Authorization: Bearer <idToken>". We never trust a uid
+// sent in the request body.
+async function requireAuth(req, res, next) {
+  const match = (req.headers.authorization || "").match(/^Bearer (.+)$/);
+  if (!match) return res.status(401).json({ error: "Missing sign-in token" });
+  try {
+    const decoded = await adminAuth.verifyIdToken(match[1]);
+    req.uid = decoded.uid;
+    next();
+  } catch (err) {
+    const msg = String(err.message || "");
+    if (/aud|audience|project/i.test(msg)) {
+      console.error(
+        `❌ App sign-in rejected: the app uses a different Firebase project than this backend ` +
+        `(${serviceAccount.project_id}). Put the service-account key from the SAME project as ` +
+        `js/firebase-config.js into backend/serviceAccountKey.json, then restart.`
+      );
+    } else {
+      console.warn("Rejected token:", err.code || msg);
+    }
+    res.status(401).json({ error: "Invalid sign-in token" });
+  }
+}
+
+// ─── Speech helpers ─────────────────────────────────────────────────────────
+function stripEmojis(text) {
+  return (text || "").replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{200D}]/gu, "").trim();
+}
+
+async function transcribeVoiceNote(mediaUrl, languageCode = "en-IN") {
   const audioResponse = await axios.get(mediaUrl, {
-    responseType: 'arraybuffer',
+    responseType: "arraybuffer",
     auth: { username: process.env.TWILIO_SID, password: process.env.TWILIO_AUTH_TOKEN }
   });
-  const audioBytes = Buffer.from(audioResponse.data).toString('base64');
-
   const [response] = await speechClient.recognize({
-    audio: { content: audioBytes },
-    config: {
-      encoding: 'OGG_OPUS',
-      sampleRateHertz: 16000,
-      languageCode: 'en-IN',
-    },
+    audio: { content: Buffer.from(audioResponse.data).toString("base64") },
+    config: { encoding: "OGG_OPUS", sampleRateHertz: 16000, languageCode }
   });
-  return response.results.map(r => r.alternatives[0].transcript).join(' ');
+  return (response.results || []).map((r) => r.alternatives[0].transcript).join(" ").trim();
 }
-async function synthesizeSpeech(text, languageCode = "kn-IN") {
+
+async function synthesizeToBuffer(text, languageCode) {
   const [response] = await ttsClient.synthesizeSpeech({
-    input: { text },
-    voice: { languageCode, ssmlGender: 'FEMALE' },
-    audioConfig: { audioEncoding: 'MP3' },
+    input: { text: stripEmojis(text).slice(0, 2000) },
+    voice: { languageCode, ssmlGender: "FEMALE" },
+    audioConfig: { audioEncoding: "MP3" }
   });
+  return Buffer.from(response.audioContent);
+}
 
+/** Turns Google's speech errors into a plain next step in the terminal. */
+function explainSpeechError(err) {
+  const msg = String(err?.message || err);
+  const project = speechCreds.key.project_id;
+  if (/SERVICE_DISABLED|has not been used|is disabled/i.test(msg)) {
+    console.error(`👉 Enable "Cloud Text-to-Speech API" and "Cloud Speech-to-Text API" for project ${project}: ` +
+      `console.cloud.google.com → APIs & Services → Library.`);
+  } else if (/BILLING|billing/i.test(msg)) {
+    console.error(`👉 Project ${project} needs billing turned on to use Google speech services.`);
+  } else if (/PERMISSION_DENIED|403/i.test(msg)) {
+    console.error(`👉 The speech key (${speechCreds.source}) isn't allowed to use speech services in ${project}. ` +
+      `Check the APIs are enabled there, or use a key from the project where they are.`);
+  } else if (/UNAUTHENTICATED|invalid_grant|401/i.test(msg)) {
+    console.error(`👉 The speech key (${speechCreds.source}) was rejected — it may have been deleted. Create a new key.`);
+  }
+}
+
+// WhatsApp needs a public URL for voice replies.
+// NOTE: Render wipes this folder on restart — move to Firebase Storage in Phase 2.
+async function synthesizeToUrl(text, languageCode) {
+  const audio = await synthesizeToBuffer(text, languageCode);
+  fs.mkdirSync(AUDIO_DIR, { recursive: true });
   const fileName = `reply-${Date.now()}.mp3`;
-  fs.writeFileSync(`./public-audio/${fileName}`, response.audioContent);
-
+  fs.writeFileSync(path.join(AUDIO_DIR, fileName), audio);
   return `${process.env.PUBLIC_BASE_URL}/audio/${fileName}`;
 }
 
-// ─── POST /chat ───────────────────────────────────────────────────────────────
-app.post("/chat", async (req, res) => {
-  const {
-    message,
-    uid,
-    userName,
-    userEmail,
-    emergencyContact,
-    emergencyPhone,
-    region, // optional, e.g. "karnataka" — falls back to "national"-only docs if absent
-  } = req.body;
+// ─── ASHA dashboard API (lib/asha.js) ───────────────────────────────────────
+app.use("/asha", createAshaRouter({ db: adminDb, adminAuth }));
 
-  // ── Flag detection — runs before AI, writes to Firestore if triggered ──────
-  const flagResult = detectFlags(message);
-  if (flagResult.flagged) {
-    try {
-      await adminDb.collection("flags").add({
-        uid:              uid              || "unknown",
-        userName:         userName         || "Unknown User",
-        userEmail:        userEmail        || "Unknown",
-        emergencyContact: emergencyContact || "Not provided",
-        emergencyPhone:   emergencyPhone   || "Not provided",
-        triggerMessage:   message,
-        keywords:         flagResult.keywords,
-        severity:         flagResult.severity,
-        resolved:         false,
-        createdAt:        new Date(),
-      });
-      console.log(`🚩 Flag saved — severity: ${flagResult.severity} | user: ${userEmail}`);
-    } catch (flagErr) {
-      // Don't block the chat response if flag write fails
-      console.error("Failed to save flag:", flagErr);
-    }
-  }
-
-  // ── RAG retrieval — ground the reply in real scheme/care facts ─────────────
-  const contextText = "";
-const sources = [];
-  if (sources.length > 0) {
-    console.log(`📚 RAG matched: ${sources.map((s) => s.id).join(", ")}`);
-  }
-
-  // ── Send message to Gemini, with retrieved facts attached if any ──────────
+// ─── GET /me ────────────────────────────────────────────────────────────────
+app.get("/me", requireAuth, async (req, res) => {
   try {
-    const groundedPrompt = contextText
-      ? `Relevant verified facts (use these for any factual/scheme/medical claims — do not invent numbers or details beyond what's given here):\n${contextText}\n\nHer message: ${message}`
-      : message;
-
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: groundedPrompt,
-      config: {
-        systemInstruction: `
-You are SheRo, a warm, empathetic AI companion designed to support pregnant women and new mothers.
-
-Your tone:
-- Kind, gentle, and emotionally supportive
-- Non-judgmental and comforting
-- Like a caring friend, not a doctor
-
-Your behavior:
-- Understand the user's emotional state (stress, sadness, anxiety, happiness)
-- Respond with empathy first, then gentle guidance
-- Keep responses short (2 to 4 lines)
-- Use simple, soothing language
-- If she asks a simple, casual, or factual question, answer it directly and warmly first — don't redirect every message into emotional support.
-
-Guidelines:
-- DO NOT give strict medical advice or diagnosis
-- DO NOT sound robotic or overly technical
-- DO NOT dismiss feelings
-
-Grounding rules (important):
-- If "Relevant verified facts" are provided above her message, base any factual claim
-  (scheme names, amounts, eligibility, medical/emergency guidance) ONLY on those facts.
-- Never invent a rupee amount, scheme name, or medical claim that isn't in the provided facts.
-- If she asks something factual and no facts were provided, say gently that you're not sure
-  and she should check with her ASHA worker or local PHC — do not guess.
-- Weave facts in naturally and briefly, in her language register — don't read them out like
-  a government notice.
-
-Instead:
-- Validate emotions ("That sounds really tough…")
-- Reassure ("You are not alone in feeling this way")
-- Offer light suggestions (rest, breathing, talking to someone)
-
-If user is:
-- Stressed → calm and reassure
-- Sad → show empathy and support
-- Anxious → gently ground them
-- Happy → celebrate with them
-
-End responses with warmth when appropriate (💛 optional but not overused)`,
-      },
-    });
-    res.json({ reply: response.text, sources: sources.map((s) => s.id) });
+    const mother = await getOrCreateAppMother(adminDb, req.uid);
+    res.json({ motherId: mother.id, language: mother.data.language || null });
   } catch (err) {
-    console.error("Chat ERROR:", err);
-    res.status(500).json({ reply: "Something went wrong. Please try again." });
+    console.error("/me ERROR:", err);
+    res.status(500).json({ error: "Could not load profile" });
   }
 });
 
-// ─── POST /grandma-wisdom ─────────────────────────────────────────────────────
+// ─── POST /chat ─────────────────────────────────────────────────────────────
+app.post("/chat", requireAuth, async (req, res) => {
+  const { message, lang, audioUrl, inputType } = req.body;
+  if (!message || typeof message !== "string" || !message.trim()) {
+    return res.status(400).json({ error: "message is required" });
+  }
+  try {
+    const mother = await getOrCreateAppMother(adminDb, req.uid, { lang });
+    const result = await processMessage(deps, {
+      mother,
+      channel: "app",
+      text: message,
+      lang,
+      inputType: ["voice", "chip", "text"].includes(inputType) ? inputType : "text",
+      audioUrl: typeof audioUrl === "string" ? audioUrl : null
+    });
+    if (result.flag?.severity) {
+      console.log(`🚩 Flag — severity: ${result.flag.severity} | mother: ${mother.id}`);
+    }
+    res.json({
+      motherId: mother.id,
+      entryId: result.entryId,
+      reply: result.reply,
+      replySource: result.replySource,
+      sources: result.sources,
+      escalation: result.escalation
+    });
+  } catch (err) {
+    console.error("Chat ERROR:", err);
+    res.status(500).json({ error: "Something went wrong. Please try again." });
+  }
+});
+
+// ─── POST /entries/sync ── messages she sent while offline ──────────────────
+// Body: { items: [{ clientId, text, lang, reply, clientTimestamp, inputType, audioUrl }] }
+app.post("/entries/sync", requireAuth, async (req, res) => {
+  const items = Array.isArray(req.body.items) ? req.body.items.slice(0, 50) : [];
+  try {
+    const mother = await getOrCreateAppMother(adminDb, req.uid);
+    const oldest = Date.now() - 30 * 86400000;
+    const results = [];
+    for (const item of items) {
+      const ts = Number(item.clientTimestamp);
+      const validId = typeof item.clientId === "string" && /^[\w-]{6,64}$/.test(item.clientId);
+      if (!validId || !item.text || !Number.isFinite(ts) || ts < oldest || ts > Date.now() + 60000) {
+        results.push({ clientId: item.clientId, ok: false });
+        continue;
+      }
+      const r = await processMessage(deps, {
+        mother,
+        channel: "app",
+        text: String(item.text),
+        lang: item.lang,
+        inputType: item.inputType || "voice",
+        audioUrl: typeof item.audioUrl === "string" ? item.audioUrl : null,
+        clientReply: typeof item.reply === "string" ? item.reply.slice(0, 2000) : undefined,
+        clientTimestamp: ts,
+        entryId: `offline_${item.clientId}`
+      });
+      results.push({ clientId: item.clientId, ok: true, entryId: r.entryId });
+    }
+    res.json({ motherId: mother.id, results });
+  } catch (err) {
+    console.error("Sync ERROR:", err);
+    res.status(500).json({ error: "Sync failed" });
+  }
+});
+
+// ─── POST /tts ── spoken replies for the app ────────────────────────────────
+app.post("/tts", requireAuth, async (req, res) => {
+  const { text, lang } = req.body;
+  if (!text || typeof text !== "string") {
+    return res.status(400).json({ error: "text is required" });
+  }
+  try {
+    const audio = await synthesizeToBuffer(text, toSpeechLang(lang));
+    res.json({ audio: audio.toString("base64"), format: "mp3" });
+  } catch (err) {
+    console.error("TTS ERROR:", err.message || err);
+    explainSpeechError(err);
+    res.status(500).json({ error: "Text-to-speech failed" });
+  }
+});
+
+// ─── POST /grandma-wisdom ───────────────────────────────────────────────────
 app.post("/grandma-wisdom", async (req, res) => {
   const { region, stage, category, count = 6 } = req.body;
 
@@ -262,78 +348,113 @@ Be extremely specific — mention actual plant/spice compounds (e.g. gingerol, t
   }
 });
 
-// ─── Strip emojis before sending text to Text-to-Speech ──────────────────────
-function stripEmojis(text) {
-  return text.replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, "").trim();
+// ─── WhatsApp (Twilio) ──────────────────────────────────────────────────────
+const WA_TEXT = {
+  welcome:
+    "Namaskara! Namaste! Welcome to Maahyu 💛\n" +
+    "ಕನ್ನಡಕ್ಕಾಗಿ 1 ಒತ್ತಿ\n" +
+    "हिंदी के लिए 2 भेजें\n" +
+    "Reply 3 for English",
+  invalidChoice: "Please reply 1 (ಕನ್ನಡ), 2 (हिंदी) or 3 (English).",
+  ready: {
+    kn: "ಸರಿ, ಶುರು ಮಾಡೋಣ! ನೀವು ಯಾವಾಗ ಬೇಕಾದರೂ ನನ್ನೊಂದಿಗೆ ಮಾತನಾಡಬಹುದು — ವಾಯ್ಸ್ ನೋಟ್ ಅಥವಾ ಮೆಸೇಜ್ ಕಳುಹಿಸಿ. 💛",
+    hi: "बहुत अच्छा, चलिए शुरू करते हैं! आप कभी भी मुझसे बात कर सकती हैं — voice note या message भेजें। 💛",
+    en: "Great, let's begin! You can talk to me anytime — send a voice note or a message. 💛"
+  },
+  notHeard: {
+    kn: "ಕ್ಷಮಿಸಿ, ನನಗೆ ಸರಿಯಾಗಿ ಕೇಳಿಸಲಿಲ್ಲ. ಮತ್ತೊಮ್ಮೆ ಕಳುಹಿಸುತ್ತೀರಾ? 💛",
+    hi: "माफ़ कीजिए, मुझे ठीक से सुनाई नहीं दिया। क्या आप फिर से भेज सकती हैं? 💛",
+    en: "Sorry, I couldn't quite hear that. Could you send it again? 💛"
+  },
+  error: "Sorry, something went wrong on my side. Please try again in a minute. 💛"
+};
+const LANG_CHOICES = { "1": "kn", "2": "hi", "3": "en" };
+
+function escapeXml(s) {
+  return String(s).replace(/[<>&'"]/g, (c) =>
+    ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", "'": "&apos;", '"': "&quot;" }[c]));
 }
 
-
-// ─── Reusable AI reply function (used by WhatsApp webhook) ───────────────────
-async function getAIReply(message) {
-  const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
-    contents: message,
-    config: {
-      systemInstruction: `
-You are SheRo, a warm, empathetic AI companion designed to support pregnant women and new mothers.
-
-Your tone:
-- Kind, gentle, and emotionally supportive
-- Non-judgmental and comforting
-- Like a caring friend, not a doctor
-
-Your behavior:
-- Understand the user's emotional state (stress, sadness, anxiety, happiness)
-- Respond with empathy first, then gentle guidance
-- Keep responses short (2 to 4 lines)
-- If she asks a simple, casual, or factual question, answer it directly and warmly first — don't redirect every message into emotional support.
-
-Guidelines:
-- DO NOT give strict medical advice or diagnosis
-- DO NOT sound robotic or overly technical
-- DO NOT dismiss feelings
-
-Instead:
-- Validate emotions ("That sounds really tough…")
-- Reassure ("You are not alone in feeling this way")
-- Offer light suggestions (rest, breathing, talking to someone)
-
-If user is:
-- Stressed → calm and reassure
-- Sad → show empathy and support
-- Anxious → gently ground them
-- Happy → celebrate with them
-
-End responses with warmth when appropriate (💛 optional but not overused)`,
-    },
-  });
-  return response.text;
-}
-
-/// ─── POST /whatsapp/webhook ───────────────────────────────────────────────────
-app.post("/whatsapp/webhook", express.urlencoded({ extended: false }), async (req, res) => {
-  const messageType = classifyMessage(req.body);
-
-  if (messageType === 'voice') {
-    const transcript = await transcribeVoiceNote(req.body.MediaUrl0);
-    console.log("Transcribed voice note:", transcript);
-
-    const aiReplyText = await getAIReply(transcript);
-    console.log("AI reply text:", aiReplyText);
-
-    console.log("Text sent to voice (emoji stripped):", stripEmojis(aiReplyText));
-    const replyAudioUrl = await synthesizeSpeech(stripEmojis(aiReplyText), "kn-IN");
-    console.log("Reply audio URL:", replyAudioUrl);
-
-    res.set("Content-Type", "text/xml");
-    return res.send(`<Response><Message><Media>${replyAudioUrl}</Media></Message></Response>`);
-  } else {
-    console.log("Message type:", messageType, "| Body:", req.body.Body);
-  }
-
+function twiml(res, { body = "", mediaUrl = null } = {}) {
   res.set("Content-Type", "text/xml");
-  res.send(`<Response><Message>Hello, I got your message!</Message></Response>`);
+  const media = mediaUrl ? `<Media>${escapeXml(mediaUrl)}</Media>` : "";
+  const text = body ? `<Body>${escapeXml(body)}</Body>` : "";
+  res.send(`<Response><Message>${text}${media}</Message></Response>`);
+}
+
+function classifyMessage(body) {
+  if (parseInt(body.NumMedia) > 0 && body.MediaContentType0?.startsWith("audio")) return "voice";
+  const emojiOnly = /^[\p{Extended_Pictographic}\u{FE0F}\u{200D}\s]+$/u;
+  if (body.Body && emojiOnly.test(body.Body.trim())) return "emoji";
+  return "text";
+}
+
+app.post("/whatsapp/webhook", express.urlencoded({ extended: false }), async (req, res) => {
+  try {
+    const mother = await getOrCreateWhatsAppMother(adminDb, req.body.From);
+    // Her WhatsApp name helps her ASHA worker recognise her on the dashboard.
+    const profileName = String(req.body.ProfileName || "").trim().slice(0, 60);
+    if (profileName && profileName !== mother.data.displayName) {
+      mother.ref.set({ displayName: profileName }, { merge: true }).catch(() => {});
+    }
+
+    // ── Onboarding: pick a language, no signup ──
+    if (mother.data.awaitingLanguage) {
+      if (mother.isNew) return twiml(res, { body: WA_TEXT.welcome });
+      const lang = LANG_CHOICES[req.body.Body?.trim()];
+      if (!lang) return twiml(res, { body: WA_TEXT.invalidChoice });
+      await mother.ref.set({ language: lang, awaitingLanguage: false }, { merge: true });
+      return twiml(res, { body: WA_TEXT.ready[lang] });
+    }
+
+    const lang = toShortLang(mother.data.language);
+    const type = classifyMessage(req.body);
+    console.log(`📩 WhatsApp ${type} from ${mother.id}: ${req.body.Body || "(voice note)"}`);
+
+    let text = req.body.Body?.trim() || "";
+    if (type === "voice") {
+      try {
+        text = await transcribeVoiceNote(req.body.MediaUrl0, toSpeechLang(lang));
+      } catch (err) {
+        console.error("STT ERROR:", err.message || err);
+        explainSpeechError(err);
+        return twiml(res, { body: WA_TEXT.notHeard[lang] });
+      }
+      console.log("Transcribed voice note:", text || "(empty)");
+      if (!text) return twiml(res, { body: WA_TEXT.notHeard[lang] });
+    }
+    if (!text) return twiml(res, { body: WA_TEXT.notHeard[lang] });
+
+    // Emoji check-ins get dedicated mood mapping in Phase 2; for now they
+    // go through the same pipeline as text.
+    const result = await processMessage(deps, {
+      mother, channel: "whatsapp", text, lang, inputType: type
+    });
+    if (result.flag?.severity) {
+      console.log(`🚩 Flag — severity: ${result.flag.severity} | mother: ${mother.id}`);
+    }
+
+    // Crisis: always include the helpline as text, even with a voice reply.
+    const urgentLine = result.escalation.level === "urgent" ? `\n\n${result.escalation.message}` : "";
+
+    if (type === "voice") {
+      try {
+        const audioUrl = await synthesizeToUrl(result.reply, toSpeechLang(lang));
+        return twiml(res, { body: urgentLine.trim(), mediaUrl: audioUrl });
+      } catch (err) {
+        // Voice reply failed: still answer her, in text.
+        console.error("TTS ERROR:", err.message || err);
+        explainSpeechError(err);
+        return twiml(res, { body: result.reply + urgentLine });
+      }
+    }
+    return twiml(res, { body: result.reply + urgentLine });
+  } catch (err) {
+    console.error("WhatsApp webhook ERROR:", err);
+    return twiml(res, { body: WA_TEXT.error });
+  }
 });
-// ─── Start server ─────────────────────────────────────────────────────────────
+
+// ─── Start server ───────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));

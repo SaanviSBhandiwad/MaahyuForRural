@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#FBEFF1" />
   <title>Maahyu — Calendar</title>
   <link rel="stylesheet" href="./css/variables.css" />
   <link rel="stylesheet" href="./css/style.css" />
@@ -25,9 +26,9 @@
     <p id="emptyState" class="hidden" style="color:var(--text-onDark-muted); margin-top:16px;" data-i18n="calendar.empty"></p>
 
     <div class="calendar-legend">
-      <span><span class="legend-swatch" style="background:var(--sage-500)"></span><span data-i18n="calendar.legendGood">Good day</span></span>
-      <span><span class="legend-swatch" style="background:var(--marigold-400)"></span><span data-i18n="calendar.legendMid">In between</span></span>
-      <span><span class="legend-swatch" style="background:var(--danger-500)"></span><span data-i18n="calendar.legendLow">Rough day</span></span>
+      <span><span class="legend-swatch" style="background:var(--mood-good)"></span><span data-i18n="calendar.legendGood">Good day</span></span>
+      <span><span class="legend-swatch" style="background:var(--mood-mid)"></span><span data-i18n="calendar.legendMid">In between</span></span>
+      <span><span class="legend-swatch" style="background:var(--mood-low)"></span><span data-i18n="calendar.legendLow">Rough day</span></span>
     </div>
 
     <div id="playbackSheet" class="playback-sheet hidden">

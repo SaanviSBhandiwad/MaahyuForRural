@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#FBEFF1" />
   <title>Maahyu</title>
   <link rel="stylesheet" href="./css/variables.css" />
   <link rel="stylesheet" href="./css/style.css" />
@@ -24,7 +25,7 @@
     <div class="mic-stage">
       <div class="mic-ring" id="micRing" aria-hidden="true"></div>
       <button class="mic-btn" id="micBtn" aria-pressed="false" aria-label="Tap to talk">
-        <svg viewBox="0 0 24 24" fill="none" stroke="#211B33" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
           <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
           <line x1="12" y1="19" x2="12" y2="23"></line>
@@ -56,7 +57,7 @@
   </main>
 
   <!-- Connect-to-helpline modal, reached from "Talk to someone" or the crisis banner -->
-  <div id="connectModal" class="screen screen--centered hidden" style="position:fixed; inset:0; background:rgba(33,27,51,0.92); z-index:20;">
+  <div id="connectModal" class="screen screen--centered hidden" style="position:fixed; inset:0; background:rgba(251,239,241,0.96); z-index:20;">
     <h2 data-i18n="connect.title">Reaching out</h2>
     <p data-i18n="connect.body" style="color:var(--text-onDark-muted); margin-top:8px;">Connecting you with your local ASHA worker / helpline.</p>
     <div class="reply-card" style="width:100%; margin-top:24px;">

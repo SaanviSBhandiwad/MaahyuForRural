@@ -150,3 +150,11 @@ backend/public-audio/*.mp3
 !backend/public-audio/.gitkeep
 
 backend/speechServiceAccountKey.json
+
+# Never commit credentials (any name or copy)
+**/*serviceAccount*
+**/*ServiceAccount*
+**/*firebase-adminsdk*.json
+**/.env
+**/.env.*
+!**/.env.example

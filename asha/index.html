@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#FBEFF1" />
+  <title>Maahyu — ASHA</title>
+  <link rel="stylesheet" href="../css/variables.css" />
+  <link rel="stylesheet" href="asha.css" />
+</head>
+<body>
+  <div class="offline-strip" id="offlineStrip" hidden>Offline — showing your last saved list. Notes will send when you're back online.</div>
+
+  <!-- ── Sign in ─────────────────────────────────────────── -->
+  <main class="view view--login" id="loginView" hidden>
+    <div class="login-card">
+      <div class="brand">Maahyu <span>ASHA</span></div>
+      <h1>Sign in</h1>
+      <p class="muted">Use the mobile number registered with your PHC.</p>
+
+      <form id="phoneForm" class="stack" novalidate>
+        <label for="phoneInput">Mobile number</label>
+        <div class="phone-field">
+          <span>+91</span>
+          <input id="phoneInput" type="tel" inputmode="numeric" maxlength="10" autocomplete="tel-national" placeholder="98765 43210" required />
+        </div>
+        <button class="btn btn--primary" id="sendOtpBtn" type="submit">Send OTP</button>
+      </form>
+
+      <form id="otpForm" class="stack" novalidate hidden>
+        <label for="otpInput">Enter the 6-digit code sent to <strong id="otpPhone"></strong></label>
+        <input id="otpInput" class="otp-input" type="text" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="••••••" required />
+        <button class="btn btn--primary" id="verifyBtn" type="submit">Verify and continue</button>
+        <button class="btn btn--text" id="changeNumberBtn" type="button">Change number</button>
+      </form>
+
+      <p class="form-error" id="loginError" role="alert"></p>
+      <div id="recaptcha"></div>
+    </div>
+  </main>
+
+  <!-- ── Mothers list ────────────────────────────────────── -->
+  <main class="view" id="listView" hidden>
+    <header class="topbar">
+      <div>
+        <div class="brand">Maahyu <span>ASHA</span></div>
+        <div class="muted small" id="ashaLine"></div>
+      </div>
+      <button class="btn btn--text" id="signOutBtn" type="button">Sign out</button>
+    </header>
+
+    <section class="stats">
+      <div class="stat stat--urgent"><strong id="statHigh">0</strong><span>Urgent</span></div>
+      <div class="stat"><strong id="statFollow">0</strong><span>Need follow-up</span></div>
+      <div class="stat"><strong id="statTotal">0</strong><span>Mothers</span></div>
+    </section>
+
+    <div class="toolbar">
+      <div class="tabs" role="tablist">
+        <button class="tab is-active" role="tab" data-filter="followup" aria-selected="true">Need follow-up</button>
+        <button class="tab" role="tab" data-filter="all" aria-selected="false">All mothers</button>
+      </div>
+      <button class="btn btn--ghost" id="refreshBtn" type="button">↻ Refresh</button>
+    </div>
+    <p class="muted small" id="updatedLine"></p>
+
+    <ul class="mother-list" id="motherList"></ul>
+    <p class="empty" id="emptyState" hidden></p>
+  </main>
+
+  <!-- ── Mother detail ───────────────────────────────────── -->
+  <main class="view" id="detailView" hidden>
+    <header class="topbar">
+      <button class="btn btn--text" id="backBtn" type="button">← All mothers</button>
+    </header>
+    <div id="detailBody"></div>
+
+    <section class="panel">
+      <h2>Add a note</h2>
+      <textarea id="noteInput" rows="3" maxlength="2000" placeholder="What happened on your visit or call? Next step?"></textarea>
+      <div class="note-actions">
+        <button class="btn btn--ghost" id="saveNoteBtn" type="button">Save note</button>
+        <button class="btn btn--primary" id="resolveBtn" type="button">Mark as followed up</button>
+      </div>
+      <p class="muted small" id="noteStatus" role="status"></p>
+    </section>
+  </main>
+
+  <script type="module" src="asha.js"></script>
+</body>
+</html>

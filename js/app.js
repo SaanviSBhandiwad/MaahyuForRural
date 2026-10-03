@@ -5,6 +5,7 @@
 // ============================================================
 import { ensureSignedIn } from "./firebase-init.js";
 import { getStoredLanguage, loadLanguage, applyTranslations } from "./i18n.js";
+import { startAutoSync } from "./offline-queue.js";
 
 /**
  * @returns {Promise<string>} the active language code
@@ -14,6 +15,7 @@ export async function bootApp() {
   await Promise.all([ensureSignedIn(), loadLanguage(lang)]);
   applyTranslations();
   wireOfflineBanner();
+  startAutoSync(); // send anything she said while offline
   return lang;
 }
 

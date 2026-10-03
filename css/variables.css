@@ -1,62 +1,78 @@
 /* ============================================================
-   MAAHYU — Design tokens
-   Palette rationale:
-   - Dusk indigo: the calm, low-stimulation base — night is when
-     many rural mothers finally get a quiet moment to themselves.
-   - Marigold: warmth and everyday ritual (marigold garlands mark
-     nearly every home occasion in India) — used only on the one
-     thing she's meant to touch: the mic.
-   - Sage: reassurance / "you're okay" states, mood + calendar.
-   - Blush parchment: soft light surface for text-heavy screens.
+   MAAHYU — Design tokens  ("Lotus at dawn")
+   ------------------------------------------------------------
+   Soft pinks for calm and warmth, deep plum ink so text stays
+   readable in bright sun, and leaf sage for reassurance. Pink
+   with sage reads as lotus and leaf: gentle, never clinical.
+
+   Contrast (WCAG AA, checked): plum ink on rose milk 10.9:1,
+   muted text 5.5:1, white on buttons 4.7:1, so everything stays
+   readable outdoors on a cheap phone screen.
    ============================================================ */
 
 :root {
   /* Core palette */
-  --dusk-900: #211B33;
-  --dusk-700: #2D2545;
-  --dusk-500: #453A66;
-  --marigold-500: #E8A33D;
-  --marigold-400: #F0B65E;
-  --marigold-glow: rgba(232, 163, 61, 0.35);
-  --sage-500: #7C9885;
-  --sage-300: #A9C2AF;
-  --blush-100: #FBF3ED;
-  --blush-050: #FDF9F6;
-  --ink-900: #211B33;
-  --ink-050: #FAF6F1;
-  --danger-500: #C1553F;
+  --rose-milk:   #FBEFF1;  /* page background */
+  --petal:       #FFF9FA;  /* cards */
+  --blush:       #F5D5DD;  /* chips, quiet surfaces */
+  --blush-deep:  #EDBFCB;  /* pressed / selected surfaces */
+  --lotus-300:   #F2A7B8;  /* mic highlight */
+  --lotus-500:   #D97A92;  /* the mic's bloom */
+  --lotus-600:   #B25670;  /* buttons (white text 4.7:1) */
+  --lotus-700:   #9E4660;  /* labels, brand, active tab, pressed buttons */
+  --plum-900:    #4B2C3B;  /* text */
+  --plum-600:    #7A5868;  /* muted text */
+  --leaf-500:    #6F9677;  /* reassurance */
+  --leaf-700:    #4E7258;  /* reassurance text */
+  --leaf-100:    #E3EEE5;
+  --apricot-300: #F1BE8F;
+  --berry-300:   #E5A3B3;
+  --berry-700:   #A23F5A;  /* urgent help only */
 
-  /* Semantic */
-  --bg-app: var(--dusk-900);
-  --bg-surface: var(--dusk-700);
-  --bg-card: var(--blush-050);
-  --text-onDark: var(--ink-050);
-  --text-onDark-muted: #C7C0D9;
-  --text-onLight: var(--ink-900);
-  --text-onLight-muted: #6B6480;
-  --accent: var(--marigold-500);
-  --accent-strong: var(--marigold-400);
-  --calm: var(--sage-500);
+  /* Mood calendar — gentle, never alarming */
+  --mood-good: #8DB89A;
+  --mood-mid:  var(--apricot-300);
+  --mood-low:  var(--berry-300);
+
+  /* Semantic (names kept so existing pages need no changes:
+     "onDark" now simply means "main text on the app background") */
+  --bg-app:            var(--rose-milk);
+  --bg-surface:        var(--blush);
+  --bg-card:           var(--petal);
+  --text-onDark:       var(--plum-900);
+  --text-onDark-muted: var(--plum-600);
+  --text-onLight:      var(--plum-900);
+  --text-onLight-muted: var(--plum-600);
+  --accent:            var(--lotus-600);
+  --accent-strong:     var(--lotus-700);
+  --calm:              var(--leaf-500);
+
+  /* Legacy names still referenced inline in older markup */
+  --sage-500: var(--mood-good);
+  --marigold-400: var(--mood-mid);
+  --danger-500: var(--mood-low);
 
   /* Type */
-  --font-display: 'Baloo 2', 'Noto Sans Kannada', 'Noto Sans Devanagari', sans-serif;
-  --font-body: 'Inter', 'Noto Sans Kannada', 'Noto Sans Devanagari', sans-serif;
+  --font-display: 'Baloo 2', 'Baloo Tamma 2', 'Noto Sans Kannada', 'Noto Sans Devanagari', system-ui, sans-serif;
+  --font-body: 'Mukta', 'Noto Sans Kannada', 'Noto Sans Devanagari', system-ui, sans-serif;
 
   /* Scale */
-  --radius-lg: 28px;
-  --radius-md: 18px;
-  --radius-sm: 10px;
+  --radius-lg: 32px;
+  --radius-md: 22px;
+  --radius-sm: 12px;
   --space-1: 8px;
   --space-2: 16px;
   --space-3: 24px;
   --space-4: 40px;
   --space-5: 64px;
 
-  --shadow-soft: 0 12px 32px rgba(33, 27, 51, 0.28);
-  --shadow-mic: 0 0 0 0 var(--marigold-glow);
+  /* Rose-tinted shadows (grey shadows look muddy on pink) */
+  --shadow-soft: 0 10px 28px rgba(182, 90, 115, 0.14);
+  --shadow-lift: 0 16px 40px rgba(182, 90, 115, 0.22);
 
   --duration-fast: 160ms;
   --duration-med: 320ms;
+  --breath: 6s; /* one calm breath: the mic halo swells and settles */
 }
 
 @media (prefers-reduced-motion: reduce) {

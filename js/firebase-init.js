@@ -12,24 +12,23 @@ import {
   onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 import {
-  getFirestore,
-  enableIndexedDbPersistence
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 import { getStorage } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-storage.js";
 import { firebaseConfig } from "./firebase-config.js";
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-export const db = getFirestore(app);
-export const storage = getStorage(app);
-
-// Offline-first: cache Firestore reads/writes locally so the app
-// keeps working (per the brief's "no internet" requirement) and
-// syncs automatically once connectivity returns.
-enableIndexedDbPersistence(db).catch(() => {
-  // Multiple tabs open, or browser doesn't support it — app still
-  // works, it just won't persist across a full reload while offline.
+// Offline-first: Firestore keeps a local copy so the app works without
+// signal, and it's shared across tabs (no "exclusive access" warnings).
+export const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
 });
+export const storage = getStorage(app);
+storage.maxUploadRetryTime = 15000; // give up after 15s instead of 10 minutes
+
 
 /**
  * Resolves once we have a signed-in user, creating an anonymous
